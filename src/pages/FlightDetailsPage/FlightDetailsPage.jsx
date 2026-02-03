@@ -20,7 +20,6 @@ const FlightDetailsPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // 1. Отримуємо дані про рейс
   const { data: flight, isLoading, isError } = useQuery({
     queryKey: ['flight', id],
     queryFn: async () => {
@@ -29,11 +28,9 @@ const FlightDetailsPage = () => {
     },
   });
 
-  // 2. Налаштування мутації для PUT запиту
   const mutation = useMutation({
     mutationFn: updateFlightSeats,
     onSuccess: () => {
-      // Оновлюємо кеш 'flights', щоб на головній змінилася кількість місць
       queryClient.invalidateQueries({ queryKey: ['flights'] });
       alert('Бронювання успішне! Кількість місць оновлено.');
       navigate('/flights');
@@ -71,10 +68,11 @@ const FlightDetailsPage = () => {
         Назад до списку
       </Button>
 
-      <Grid container spacing={4}>
+      {/* alignItems="stretch" змушує колонки бути однакової висоти */}
+      <Grid container spacing={4} alignItems="stretch">
         {/* КАРТКА РЕЙСУ */}
-        <Grid item xs={12} md={5}>
-          <Paper elevation={3} sx={{ p: 3, height: '100%', borderRadius: 2, bgcolor: '#f8f9fa' }}>
+        <Grid item xs={12} md={5} sx={{ display: 'flex' }}>
+          <Paper elevation={3} sx={{ p: 3, width: '100%', borderRadius: 2, bgcolor: '#f8f9fa', display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h5" gutterBottom fontWeight="bold">Квиток</Typography>
             <Typography variant="subtitle1" color="primary" fontWeight="bold">
               {flight.airline}
@@ -96,17 +94,19 @@ const FlightDetailsPage = () => {
               </Box>
             </Box>
 
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="h4" color="success.main" fontWeight="bold">${flight.price}</Typography>
-            <Typography variant="body2" color="textSecondary">Вільних місць: {flight.availableSeats}</Typography>
+            <Box sx={{ mt: 'auto' }}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h4" color="success.main" fontWeight="bold">${flight.price}</Typography>
+              <Typography variant="body2" color="textSecondary">Вільних місць: {flight.availableSeats}</Typography>
+            </Box>
           </Paper>
         </Grid>
 
         {/* ФОРМА */}
-        <Grid item xs={12} md={7}>
-          <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+        <Grid item xs={12} md={7} sx={{ display: 'flex' }}>
+          <Paper elevation={3} sx={{ p: 3, width: '100%', borderRadius: 2, display: 'flex', flexDirection: 'column' }}>
             <Typography variant="h5" gutterBottom fontWeight="bold">Бронювання</Typography>
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form onSubmit={handleSubmit(onSubmit)} style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
               <TextField
                 {...register('fullName')}
                 label="Прізвище та ім'я"
@@ -126,20 +126,22 @@ const FlightDetailsPage = () => {
                 disabled={mutation.isPending}
               />
               
-              <FormControlLabel
-                control={<Checkbox {...register('confirmAgreement')} disabled={mutation.isPending} />}
-                label="Я погоджуюсь з правилами"
-              />
-              {errors.confirmAgreement && (
-                <Typography color="error" variant="caption" display="block">{errors.confirmAgreement.message}</Typography>
-              )}
+              <Box sx={{ mt: 1 }}>
+                <FormControlLabel
+                  control={<Checkbox {...register('confirmAgreement')} disabled={mutation.isPending} />}
+                  label="Я погоджуюсь з правилами"
+                />
+                {errors.confirmAgreement && (
+                  <Typography color="error" variant="caption" display="block">{errors.confirmAgreement.message}</Typography>
+                )}
+              </Box>
 
               <Button
                 type="submit"
                 variant="contained"
                 fullWidth
                 size="large"
-                sx={{ mt: 3, py: 1.5 }}
+                sx={{ mt: 'auto', py: 1.5, mb: 1 }}
                 disabled={mutation.isPending || flight.availableSeats <= 0}
               >
                 {mutation.isPending ? 'Обробка...' : 'Забронювати зараз'}
