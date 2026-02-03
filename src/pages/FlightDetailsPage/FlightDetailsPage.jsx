@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import axios from 'axios';
@@ -12,12 +12,15 @@ import FlightLandIcon from '@mui/icons-material/FlightLand';
 import FlightTakeoffIcon from '@mui/icons-material/FlightTakeoff';
 
 import { bookingSchema } from '../../utils/validationSchemas';
+import { updateFlightSeats } from '../../api/flightService';
 import Loader from '../../components/Loader/Loader';
 
 const FlightDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
+  // 1. Отримуємо дані про рейс
   const { data: flight, isLoading, isError } = useQuery({
     queryKey: ['flight', id],
     queryFn: async () => {
@@ -26,14 +29,31 @@ const FlightDetailsPage = () => {
     },
   });
 
+  // 2. Налаштування мутації для PUT запиту
+  const mutation = useMutation({
+    mutationFn: updateFlightSeats,
+    onSuccess: () => {
+      // Оновлюємо кеш 'flights', щоб на головній змінилася кількість місць
+      queryClient.invalidateQueries({ queryKey: ['flights'] });
+      alert('Бронювання успішне! Кількість місць оновлено.');
+      navigate('/flights');
+    },
+    onError: (error) => {
+      console.error(error);
+      alert('Помилка сервера при спробі забронювати місце.');
+    }
+  });
+
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(bookingSchema),
   });
 
   const onSubmit = (data) => {
-    console.log("Дані бронювання:", data);
-    alert(`Успішно! Квиток для ${data.fullName} заброньовано. Перевірте пошту ${data.email}`);
-    navigate('/flights');
+    if (flight.availableSeats > 0) {
+      mutation.mutate({ id: flight.id, currentSeats: flight.availableSeats });
+    } else {
+      alert("На жаль, вільних місць на цей рейс більше немає.");
+    }
   };
 
   if (isLoading) return <Loader message="Завантажуємо деталі рейсу..." />;
@@ -52,49 +72,40 @@ const FlightDetailsPage = () => {
       </Button>
 
       <Grid container spacing={4}>
-        {/* ІНФОРМАЦІЯ ПРО РЕЙС */}
+        {/* КАРТКА РЕЙСУ */}
         <Grid item xs={12} md={5}>
           <Paper elevation={3} sx={{ p: 3, height: '100%', borderRadius: 2, bgcolor: '#f8f9fa' }}>
-            <Typography variant="h5" gutterBottom fontWeight="bold">
-              Деталі рейсу
+            <Typography variant="h5" gutterBottom fontWeight="bold">Квиток</Typography>
+            <Typography variant="subtitle1" color="primary" fontWeight="bold">
+              {flight.airline}
             </Typography>
-            <Typography variant="subtitle1" color="primary" gutterBottom>
-              {flight.airline} • {flight.flightNumber}
-            </Typography>
-            
             <Divider sx={{ my: 2 }} />
             
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-              <FlightTakeoffIcon color="action" />
-              <Box>
-                <Typography variant="body2" color="textSecondary">Виліт</Typography>
-                <Typography variant="h6">{flight.origin}</Typography>
-                <Typography variant="body2">{flight.departureDate} о {flight.departureTime}</Typography>
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <FlightTakeoffIcon color="action" />
+                <Typography variant="body1"><strong>{flight.origin}</strong></Typography>
               </Box>
+              <Typography variant="body2" sx={{ ml: 4 }}>{flight.departureDate} о {flight.departureTime}</Typography>
             </Box>
 
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-              <FlightLandIcon color="action" />
-              <Box>
-                <Typography variant="body2" color="textSecondary">Прибуття</Typography>
-                <Typography variant="h6">{flight.destination}</Typography>
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <FlightLandIcon color="action" />
+                <Typography variant="body1"><strong>{flight.destination}</strong></Typography>
               </Box>
             </Box>
 
             <Divider sx={{ my: 2 }} />
-            
-            <Typography variant="h4" color="success.main" fontWeight="bold">
-              ${flight.price}
-            </Typography>
+            <Typography variant="h4" color="success.main" fontWeight="bold">${flight.price}</Typography>
+            <Typography variant="body2" color="textSecondary">Вільних місць: {flight.availableSeats}</Typography>
           </Paper>
         </Grid>
 
-        {/* ФОРМА БРОНЮВАННЯ */}
+        {/* ФОРМА */}
         <Grid item xs={12} md={7}>
           <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="h5" gutterBottom fontWeight="bold">
-              Дані пасажира
-            </Typography>
+            <Typography variant="h5" gutterBottom fontWeight="bold">Бронювання</Typography>
             <form onSubmit={handleSubmit(onSubmit)}>
               <TextField
                 {...register('fullName')}
@@ -103,36 +114,35 @@ const FlightDetailsPage = () => {
                 margin="normal"
                 error={!!errors.fullName}
                 helperText={errors.fullName?.message}
+                disabled={mutation.isPending}
               />
               <TextField
                 {...register('email')}
-                label="Електронна пошта"
+                label="Email"
                 fullWidth
                 margin="normal"
                 error={!!errors.email}
                 helperText={errors.email?.message}
+                disabled={mutation.isPending}
               />
               
-              <Box sx={{ mt: 2 }}>
-                <FormControlLabel
-                  control={<Checkbox {...register('confirmAgreement')} />}
-                  label="Я підтверджую правильність даних та згоден з умовами"
-                />
-                {errors.confirmAgreement && (
-                  <Typography color="error" variant="caption" display="block">
-                    {errors.confirmAgreement.message}
-                  </Typography>
-                )}
-              </Box>
+              <FormControlLabel
+                control={<Checkbox {...register('confirmAgreement')} disabled={mutation.isPending} />}
+                label="Я погоджуюсь з правилами"
+              />
+              {errors.confirmAgreement && (
+                <Typography color="error" variant="caption" display="block">{errors.confirmAgreement.message}</Typography>
+              )}
 
               <Button
                 type="submit"
                 variant="contained"
                 fullWidth
                 size="large"
-                sx={{ mt: 4, py: 1.5, textTransform: 'none', fontSize: '1.1rem' }}
+                sx={{ mt: 3, py: 1.5 }}
+                disabled={mutation.isPending || flight.availableSeats <= 0}
               >
-                Підтвердити бронювання
+                {mutation.isPending ? 'Обробка...' : 'Забронювати зараз'}
               </Button>
             </form>
           </Paper>
