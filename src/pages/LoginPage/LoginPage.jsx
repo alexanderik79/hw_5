@@ -1,3 +1,4 @@
+import { useState } from 'react'; // Додали стан
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { 
@@ -8,9 +9,14 @@ import {
   Button, 
   Card, 
   CardContent, 
-  Alert 
+  Alert,
+  InputAdornment, // Додали для ока
+  IconButton     // Додали для ока
 } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
+import Visibility from '@mui/icons-material/Visibility'; // Додали іконку
+import VisibilityOff from '@mui/icons-material/VisibilityOff'; // Додали іконку
+
 import { loginSchema } from '../../utils/validationSchemas';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +24,9 @@ import { useNavigate } from 'react-router-dom';
 const LoginPage = () => {
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
+  
+  // Стейт для перемикання видимості пароля
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -32,7 +41,6 @@ const LoginPage = () => {
       login('fake-token-123', data.username);
       navigate('/');
     } else {
-      // Тут можна замінити alert на MUI Alert (стейт для помилки)
       alert("Невірний логін або пароль!");
     }
   };
@@ -63,12 +71,26 @@ const LoginPage = () => {
               <TextField
                 {...register("password")}
                 label="Пароль"
-                type="password"
+                // Тип змінюється залежно від стейту
+                type={showPassword ? 'text' : 'password'} 
                 fullWidth
                 margin="normal"
                 error={!!errors.password}
                 helperText={errors.password?.message}
                 variant="outlined"
+                // ОСЬ ТУТ МИ ДОДАЄМО ОКО:
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
 
               <Button
